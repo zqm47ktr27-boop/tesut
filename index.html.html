@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>不良カウント</title>
+<style>
+body {
+  font-family: sans-serif;
+  margin: 10px;
+}
+
+.top {
+  margin-bottom: 10px;
+}
+
+input {
+  width: 120px;
+  font-size: 16px;
+  margin-right: 10px;
+}
+
+/* 画像表示 */
+#preview {
+  display: none;
+  width: 100%;
+  height: 60vh; /* 画面の6割を画像表示に */
+  object-fit: contain;
+  background: black;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+/* ボタンと名前の配置 */
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 横4列 */
+  grid-template-rows: repeat(3, 1fr);    /* 縦3列 */
+  gap: 10px;
+  justify-items: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/* ボタン内名称とカウントの構造 */
+.defect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* 名前表示 */
+.defect .name {
+  cursor: pointer;
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+/* カウントボタン */
+.defect button {
+  width: 100%;  /* グリッド内で可能な限り大きく */
+  height: 100px; /* 高さ大きめ（8.3インチ向け） */
+  font-size: 24px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+}
+
+/* 下部 */
+.bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+#submit {
+  background: green;
+  height: 60px;
+  width: 120px;
+  font-size: 20px;
+  color: white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="top">
+  作業者 <input id="operator">
+  Lot <input id="lot">
+  検査数 <input id="inspectionTotal" type="number">
+</div>
+
+<img id="preview">
+
+<div class="buttons" id="buttons"></div>
+
+<div class="bottom">
+  <div>
+    不良数: <span id="ngtotal">0</span>
+    不良率: <span id="rate">0%</span>
+  </div>
+  <button id="submit">完了</button>
+</div>
+
+<script>
+let counts = {A:0,B:0,C:0,D:0,E:0,F:0,G:0,H:0,I:0,J:0,other1:0,other2:0};
+const defectImages = {
+  A:"img/A.jpg", B:"img/B.jpg", C:"img/C.jpg",
+  D:"img/D.jpg", E:"img/E.jpg", F:"img/F.jpg",
+  G:"img/G.jpg", H:"img/H.jpg", I:"img/I.jpg", J:"img/J.jpg"
+};
+
+let imageOpen = false;
+
+function getColor(count){
+  if(count >= 30) return "red";
+  if(count >= 20) return "orange";
+  return "steelblue";
+}
+
+function update(){
+  let ngTotal = Object.values(counts).reduce((a,b)=>a+b,0);
+  let inspectionTotal = parseInt(document.getElementById("inspectionTotal").value) || 0;
+
+  document.getElementById("ngtotal").innerText = ngTotal;
+  let rate = inspectionTotal > 0 ? (ngTotal / inspectionTotal * 100) : 0;
+  document.getElementById("rate").innerText = rate.toFixed(1) + "%";
+
+  Object.keys(counts).forEach(key=>{
+    let btn = document.getElementById("btn_"+key);
+    btn.style.backgroundColor = getColor(counts[key]);
+    btn.innerText = counts[key];
+  });
+}
+
+function showImage(key){
+  imageOpen = true;
+  const img = document.getElementById("preview");
+  img.src = defectImages[key];
+  img.style.display = "block";
+}
+
+document.getElementById("preview").onclick = ()=>{
+  imageOpen = false;
+  document.getElementById("preview").style.display = "none";
+};
+
+function createButtons(){
+  const container = document.getElementById("buttons");
+
+  Object.keys(counts).forEach(key=>{
+    const div = document.createElement("div");
+    div.className = "defect";
+
+    const span = document.createElement("span");
+    span.className = "name";
+    span.innerText = key;
+    span.onclick = ()=> showImage(key);
+    div.appendChild(span);
+
+    const btn = document.createElement("button");
+    btn.id = "btn_" + key;
+
+    let pressTimer;
+    let isLongPress = false;
+
+    btn.onmousedown = ()=> {
+      isLongPress = false;
+      pressTimer = setTimeout(()=>{
+        isLongPress = true;
+      },300); // 0.3秒で長押し
+    };
+
+    btn.onmouseup = ()=> {
+      clearTimeout(pressTimer);
+
+      if(isLongPress){
+        counts[key] = Math.max(0, counts[key]-1); // 長押し後に減算
+        update();
+      }
+    };
+
+    btn.onclick = (e)=>{
+      if(isLongPress){
+        e.preventDefault(); // 長押し時のクリックを無効化
+        return;
+      }
+
+      if(imageOpen) return;
+
+      counts[key]++;
+      update();
+    };
+
+    btn.onmouseleave = ()=> clearTimeout(pressTimer);
+
+    div.appendChild(btn);
+    container.appendChild(div);
+  });
+}
+
+document.getElementById("submit").onclick = ()=>{
+  if(!confirm("送信しますか？")) return;
+
+  let ngTotal = Object.values(counts).reduce((a,b)=>a+b,0);
+  let inspectionTotal = parseInt(document.getElementById("inspectionTotal").value) || 0;
+
+  if(ngTotal > inspectionTotal){
+    alert("不良数が検査数を超えています");
+    return;
+  }
+
+  console.log({
+    operator: document.getElementById("operator").value,
+    lot: document.getElementById("lot").value,
+    inspectionTotal,
+    counts,
+    ngTotal
+  });
+
+  alert("送信（仮）");
+
+  Object.keys(counts).forEach(k=>counts[k]=0);
+  update();
+};
+
+createButtons();
+update();
+if ('serviceWorker' in navigator) {
+  // サービスワーカーを登録
+  navigator.serviceWorker.register('/sw.js').then((registration) => {
+    console.log('Service Worker がスコープで登録されました: ', registration.scope); // ここを修正
+  }).catch((error) => {
+    console.log('Service Worker の登録に失敗しました: ', error);
+  });
+}
+</script>
+</body>
+</html>
